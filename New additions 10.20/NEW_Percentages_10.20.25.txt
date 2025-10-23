@@ -1,0 +1,68 @@
+USE DATABASE DM_SUPPLYCHAIN;
+
+WITH Metric_Data AS (
+    SELECT
+        RPT_MONTH,
+        VENDOR_NUMBER,
+        VENDOR_NAME,
+        Case 
+            When Metric Like 'First_Receipt_FR_B1D' Then '1.Shipments_In_Full_1D'
+            When Metric Like 'First_Receipt_FR_B28D' Then '2.Inbound_Fill_Rate_28D'
+            When Metric Like 'Units_On_Time_Complete' Then '3.Units_On_Time_Complete'
+        End As MetricType,
+        TO_CHAR((SUM(METRIC_NUMERATOR)/SUM(METRIC_DENOMINATOR)) * 100, 'FM999.9') || '%' AS Metric_Percentage
+    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    WHERE 
+        VENDOR_NUMBER IN ('7580')  -- Metric Data Vendor Filter
+        AND RPT_MONTH like 'FY2025-SEP' -- Metric Data Month Filter
+        AND METRIC IN ('First_Receipt_FR_B1D', 'First_Receipt_FR_B28D', 'Units_On_Time_Complete')
+    GROUP BY RPT_MONTH, VENDOR_NUMBER, VENDOR_NAME, MetricType
+),
+
+ASN_Data AS (
+    SELECT
+        LTRIM(IH.LIFNR, 0) AS Vendor_Number,
+        V.NAME1 AS Vendor_Name,
+        TO_DATE(IH.ERDAT, 'YYYYMMDD') AS ERDAT_DATE,
+        TO_CHAR((TO_DATE(IH.ERDAT, 'YYYYMMDD')), '\"FY\"YYYY-MON') AS RPT_MONTH,
+        IH.VSTEL AS DC,
+        ZUKRL AS PO_Number,
+        LTRIM(IL.MATNR, 0) AS Material_Number,
+        
+        CASE 
+            WHEN IH.VBELN LIKE '06%' AND IH.ERNAM IN ('BPAREMOTE', 'SCEBATCH', 'P2P_IDOC', 'P2PBATCH') THEN 'ASN'
+            WHEN IH.VBELN LIKE '10%' THEN 'EGR'
+            ELSE 'Manually Created'
+        END AS Inbound_Type
+    FROM EDP.STD_ECC.LIKP IH 
+    
+    INNER JOIN EDP.STD_ECC.LFA1 V
+        ON IH.MANDT = V.MANDT
+        AND IH.LIFNR = V.LIFNR
+        
+    INNER JOIN EDP.STD_ECC.LIPS IL
+        ON IH.MANDT = IL.MANDT
+        AND IH.VBELN = IL.VBELN
+    WHERE IH.MANDT = '300'
+        AND IH.LFART = 'ZEL'
+        AND LTRIM(IH.LIFNR, 0) IN ('7580'
+) -- ASN Supplier Filter
+        AND IH.ERDAT LIKE '2025-SEP' -- ASN Month Filter
+),
+
+ASN_Metric AS (
+    SELECT
+        RPT_MONTH,
+        Vendor_Number,
+        Vendor_Name,
+        '4.ASN_Success_Rate' AS Metric,
+        TO_CHAR(COUNT(CASE WHEN Inbound_Type = 'ASN' THEN 1 END) * 100.0 / COUNT(*), 'FM999.9') || '%' AS Metric_Percentage
+    FROM ASN_Data
+    
+    GROUP BY RPT_MONTH, Vendor_Number, Vendor_Name
+)
+
+SELECT * FROM Metric_Data
+UNION ALL
+SELECT * FROM ASN_Metric
+ORDER BY VENDOR_NUMBER, MetricType;

@@ -123,10 +123,13 @@ class SPPAutomationEnhanced:
                 account='HDSUPPLY-DATA',
                 user=self.user_email,
                 authenticator='externalbrowser',
+                database='DM_SUPPLYCHAIN',  # Set default database context
+                warehouse='WH_SUPPLYCHAIN_ANALYST_XSMALL',
+                role='SUPPLYCHAIN_ANALYST',
                 insecure_mode=True
             )
             
-            self.logger.info("Successfully connected to Snowflake")
+            self.logger.info("Successfully connected to Snowflake with database context set")
             return True
             
         except Exception as e:
@@ -138,8 +141,6 @@ class SPPAutomationEnhanced:
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
-USE DATABASE DM_SUPPLYCHAIN;
-
 WITH Metric_Data AS (
     SELECT
         RPT_MONTH,
@@ -151,7 +152,7 @@ WITH Metric_Data AS (
             When Metric Like 'Units_On_Time_Complete' Then '3.Units_On_Time_Complete'
         End As MetricType,
         TO_CHAR((SUM(METRIC_NUMERATOR)/SUM(METRIC_DENOMINATOR)) * 100, 'FM999.9') || '%' AS Metric_Percentage
-    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    FROM VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
     WHERE 
         VENDOR_NUMBER IN ('{vendor_filter}')  -- Metric Data Vendor Filter
         AND RPT_MONTH like '{report_month}' -- Metric Data Month Filter
@@ -212,7 +213,6 @@ ORDER BY VENDOR_NUMBER, MetricType
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
-USE DATABASE DM_SUPPLYCHAIN;
 WITH primary_metric AS (
     SELECT
         VENDOR_NUMBER,
@@ -238,7 +238,7 @@ WITH primary_metric AS (
         METRIC_NUMERATOR,
         METRIC_DENOMINATOR,
         NETWORK
-    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    FROM VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
     WHERE 
         VENDOR_NUMBER IN ('{vendor_filter}') -- Supplier Filter
         AND RPT_MONTH LIKE '{report_month}' -- Month Filter
@@ -250,8 +250,8 @@ hds_receipts AS (
         CONCAT(e.ebeln, ':', LTRIM(e.MATNR, '0')) AS Metric_Concatenate,
         MAX(TRY_TO_DATE(TO_CHAR(e.budat), 'yyyymmdd')) AS receipt_date,
         a.MIC
-    FROM edp.std_ecc.ekbe e
-    LEFT JOIN DM_SUPPLYCHAIN.IA_ATLAS.ATLAS a
+    FROM EDP.STD_ECC.EKBE e
+    LEFT JOIN IA_ATLAS.ATLAS a
         ON LTRIM(e.MATNR, '0') = LTRIM(a.MATERIAL, '0')
     WHERE e.bwart IN ('101', '102')
     GROUP BY e.ebeln, e.MATNR, a.MIC
@@ -262,7 +262,7 @@ hdp_receipts AS (
         CONCAT(PO_NUMBER, ':', USN) AS Metric_Concatenate,
         MAX(TO_DATE(DATE_RECEIVED)) AS receipt_date,
         MANUFACTURER_PART_NUMBER AS MIC
-    FROM DM_SUPPLYCHAIN.PRO_INVENTORY_ANALYTICS.REPORT_PURCHASE_ORDER_VISIBILITY_SHIPMENTS
+    FROM PRO_INVENTORY_ANALYTICS.REPORT_PURCHASE_ORDER_VISIBILITY_SHIPMENTS
     GROUP BY PO_NUMBER, USN, MANUFACTURER_PART_NUMBER
 ),
 
@@ -310,7 +310,6 @@ LEFT JOIN combined_receipts cr
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
-USE DATABASE DM_SUPPLYCHAIN;
 SELECT
     CASE 
         WHEN IH.VBELN LIKE '06%' AND IH.ERNAM IN ('BPAREMOTE', 'SCEBATCH', 'P2P_IDOC', 'P2PBATCH') THEN 'ASN'
@@ -367,27 +366,16 @@ WHERE IH.MANDT = '300'
             self.logger.info("Executing Snowflake query...")
             cursor = self.connection.cursor()
             
-            # Execute query - may contain multiple statements (e.g., USE DATABASE + SELECT)
+            # Execute query - now single statement since database context is set in connection
             cursor.execute(query)
             
-            # Initialize variables
-            columns = []
-            data = []
+            # Get column names
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
             
-            # If there are multiple statements, we need to get the last result set
-            # The USE DATABASE statement returns no data, so we skip to the actual query result
-            while True:
-                if cursor.description:  # This result set has data
-                    # Get column names
-                    columns = [desc[0] for desc in cursor.description]
-                    # Fetch data
-                    data = cursor.fetchall()
-                
-                # Try to move to next result set
-                if not cursor.nextset():
-                    break
+            # Fetch data
+            data = cursor.fetchall()
             
-            # Create DataFrame from the last result set with data
+            # Create DataFrame
             df = pd.DataFrame(data, columns=columns)
             
             self.logger.info(f"Query executed successfully. Retrieved {len(df)} rows.")

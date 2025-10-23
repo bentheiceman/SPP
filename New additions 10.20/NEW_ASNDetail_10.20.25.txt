@@ -1,0 +1,46 @@
+USE DATABASE DM_SUPPLYCHAIN;
+SELECT
+    CASE 
+        WHEN IH.VBELN LIKE '06%' AND IH.ERNAM IN ('BPAREMOTE', 'SCEBATCH', 'P2P_IDOC', 'P2PBATCH') THEN 'ASN'
+        WHEN IH.VBELN LIKE '10%' THEN 'EGR'
+        ELSE 'Manually Created'
+    END AS Inbound_Type,
+
+    V.NAME1 AS Vendor_Name,
+    LTRIM(IH.LIFNR, 0) AS Vendor_Number,
+    TO_DATE(IH.ERDAT, 'YYYYMMDD') AS Create_Date,
+    IH.VSTEL AS DC,
+    ZUKRL AS PO_Number,
+    M.MFRPN AS Vendor_Part_Number,
+    LTRIM(IL.MATNR, 0) AS Material_Number,
+    IL.ARKTX AS Material_Description,
+    IL.ORMNG as Quantity_Ordered,
+    IL.LFIMG AS Quantity_Received,
+    IL.MEINS AS Unit_of_Measure,
+    LTRIM(IH.VBELN, 0) AS Delivery_Number,
+    LIFEX AS Supplier_Provided_ID,
+    ZCARRIER_T AS Carrier_Name,
+    BOLNR AS Provided_BOL,
+    CASE 
+        WHEN Inbound_Type = 'ASN' THEN 'Compliant'
+        ELSE 'Non-Compliant'
+    END AS "Result"
+
+FROM EDP.STD_ECC.LIKP IH 
+
+INNER JOIN EDP.STD_ECC.LIPS IL
+    ON IH.MANDT = IL.MANDT
+    AND IH.VBELN = IL.VBELN
+
+INNER JOIN EDP.STD_ECC.LFA1 V
+    ON IH.MANDT = V.MANDT
+    AND IH.LIFNR = V.LIFNR
+
+INNER JOIN EDP.STD_ECC.MARA M 
+    ON IH.MANDT = M.MANDT
+    AND IL.MATNR = M.MATNR
+
+WHERE IH.MANDT = '300'
+    AND IH.LFART = 'ZEL'
+    AND LTRIM(IH.LIFNR, 0) IN ('28177') -- Ensure you're filtering the trimmed version
+    AND IH.ERDAT LIKE '202509%'; -- Filter for Month/Year

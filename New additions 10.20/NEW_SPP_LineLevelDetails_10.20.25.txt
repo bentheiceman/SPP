@@ -1,0 +1,90 @@
+USE DATABASE DM_SUPPLYCHAIN;
+WITH primary_metric AS (
+    SELECT
+        VENDOR_NUMBER,
+        VENDOR_NAME,
+        CONCAT(VENDOR_NUMBER,' - ',vendor_name) AS VENDOR,
+        PO_NUMBER,
+        USN,
+        ITEM_DESCRIPTION,
+        CONCAT(PO_NUMBER, ':', USN) AS Metric_Concatenate,
+        CONCAT (USN, ' - ', ITEM_DESCRIPTION) as SKU,
+        TO_DATE(DATE_ORIG_ORDERED) AS DATE_ORIG_ORDERED,
+        TO_DATE(DATE_ORIG_PROMISED) AS DATE_ORIG_PROMISED,
+        TO_DATE(DATE_FIRST_RECEIVED) AS DATE_FIRST_RECEIVED,
+        WAREHOUSE_NUM,
+        WAREHOUSE_NAME,
+        CASE 
+            WHEN Metric LIKE 'First_Receipt_FR_B1D' THEN 'Shipments_In_Full_1D'
+            WHEN Metric LIKE 'First_Receipt_FR_B28D' THEN 'Inbound_Fill_Rate_28D'
+            WHEN Metric LIKE 'Units_On_Time_Complete' THEN 'Units_On_Time_Complete'
+        END AS MetricType,
+        RPT_MONTH,
+        FSCL_YR_PRD,
+        METRIC_NUMERATOR,
+        METRIC_DENOMINATOR,
+        NETWORK
+    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    WHERE 
+        VENDOR_NUMBER IN ('13918') -- Supplier Filter
+        AND RPT_MONTH LIKE 'FY2025-SEP' -- Month Filter
+        AND METRIC IN ('First_Receipt_FR_B1D', 'First_Receipt_FR_B28D', 'Units_On_Time_Complete')
+),
+
+hds_receipts AS (
+    SELECT 
+        CONCAT(e.ebeln, ':', LTRIM(e.MATNR, '0')) AS Metric_Concatenate,
+        MAX(TRY_TO_DATE(TO_CHAR(e.budat), 'yyyymmdd')) AS receipt_date,
+        a.MIC
+    FROM edp.std_ecc.ekbe e
+    LEFT JOIN DM_SUPPLYCHAIN.IA_ATLAS.ATLAS a
+        ON LTRIM(e.MATNR, '0') = LTRIM(a.MATERIAL, '0')
+    WHERE e.bwart IN ('101', '102')
+    GROUP BY e.ebeln, e.MATNR, a.MIC
+),
+
+hdp_receipts AS (
+    SELECT
+        CONCAT(PO_NUMBER, ':', USN) AS Metric_Concatenate,
+        MAX(TO_DATE(DATE_RECEIVED)) AS receipt_date,
+        MANUFACTURER_PART_NUMBER AS MIC
+    FROM DM_SUPPLYCHAIN.PRO_INVENTORY_ANALYTICS.REPORT_PURCHASE_ORDER_VISIBILITY_SHIPMENTS
+    GROUP BY PO_NUMBER, USN, MANUFACTURER_PART_NUMBER
+),
+
+combined_receipts AS (
+    SELECT
+        Metric_Concatenate,
+        MAX(receipt_date) AS receipt_date,
+        MAX(MIC) AS MIC
+    FROM (
+        SELECT Metric_Concatenate, receipt_date, MIC FROM hds_receipts
+        UNION ALL
+        SELECT Metric_Concatenate, receipt_date, MIC FROM hdp_receipts
+    ) all_receipts
+    GROUP BY Metric_Concatenate
+)
+
+SELECT
+    pm.RPT_MONTH AS Report_Month,
+    pm.NETWORK,
+    pm.VENDOR,
+    pm.WAREHOUSE_NUM,
+    pm.WAREHOUSE_NAME,
+    pm.PO_NUMBER,
+    pm.SKU,
+    cr.MIC as Vendor_Part_Number,
+    pm.DATE_ORIG_ORDERED AS Date_Ordered,
+    pm.DATE_FIRST_RECEIVED,
+    cr.receipt_date AS Date_Last_Received,
+    pm.MetricType,
+    zeroifnull(pm.METRIC_NUMERATOR) AS Metric_Units_Received,
+    pm.METRIC_DENOMINATOR AS Metric_Units_Ordered,
+    CASE 
+        WHEN zeroifnull(pm.METRIC_NUMERATOR) < pm.METRIC_DENOMINATOR THEN 'Non-Compliant'
+        ELSE 'Compliant'
+    END AS "Result"
+
+FROM primary_metric pm
+LEFT JOIN combined_receipts cr
+    ON pm.Metric_Concatenate = cr.Metric_Concatenate; 
