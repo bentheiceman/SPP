@@ -1,7 +1,0 @@
-# SPP Metric Automation Requirements
-
-# Install required packages
-pip install pandas
-pip install snowflake-connector-python
-pip install openpyxl
-pip install xlwings

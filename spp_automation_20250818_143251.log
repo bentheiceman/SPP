@@ -1,0 +1,8 @@
+2025-08-18 14:32:51,682 - INFO - Using user-specified template: C:\Users\1015723\OneDrive - HD Supply, Inc\Documents\Cole - Multi-Query information and template\Simplified Macro Template - SPP Monthly Details.xlsm
+2025-08-18 14:32:51,682 - INFO - Using user-specified template: C:\Users\1015723\OneDrive - HD Supply, Inc\Documents\Cole - Multi-Query information and template\Simplified Macro Template - SPP Monthly Details.xlsm
+2025-08-18 14:32:51,682 - INFO - Using user-specified template: C:\Users\1015723\OneDrive - HD Supply, Inc\Documents\Cole - Multi-Query information and template\Simplified Macro Template - SPP Monthly Details.xlsm
+2025-08-18 14:32:51,693 - INFO - Template copied from C:\Users\1015723\OneDrive - HD Supply, Inc\Documents\Cole - Multi-Query information and template\Simplified Macro Template - SPP Monthly Details.xlsm to Output\123456 - TEST VENDOR - 01 25.xlsm
+2025-08-18 14:32:57,983 - INFO - Connecting to Snowflake with user: None
+2025-08-18 14:32:57,983 - INFO - Snowflake Connector for Python Version: 3.17.1, Python Version: 3.10.11, Platform: Windows-10-10.0.26100-SP0
+2025-08-18 14:32:57,983 - INFO - Connecting to GLOBAL Snowflake domain
+2025-08-18 14:32:57,989 - ERROR - Failed to connect to Snowflake: 251005: 251005: User is empty, but it must be provided unless authenticator is one of PAT_WITH_EXTERNAL_SESSION, NO_AUTH, WORKLOAD_IDENTITY, OAUTH, PROGRAMMATIC_ACCESS_TOKEN.

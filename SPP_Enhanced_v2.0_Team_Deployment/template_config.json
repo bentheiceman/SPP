@@ -1,0 +1,12 @@
+{
+  "template_path": "C:/Users/1015723/OneDrive - HD Supply, Inc/Documents/Cole - Multi-Query information and template/Simplified Macro Template - SPP Monthly Details.xlsm",
+  "use_template": true,
+  "template_name": "SPP_Template.xlsm",
+  "output_format": "xlsm",
+  "search_paths": [
+    "C:\\\\Users\\\\%USERNAME%\\\\OneDrive\\\\Documents",
+    "C:\\\\Users\\\\%USERNAME%\\\\Documents",
+    "."
+  ],
+  "last_updated": "2025-08-19T14:46:47.086553"
+}

@@ -23,7 +23,7 @@ class SPPAutomationGUI:
     def create_widgets(self):
         # Main frame
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.grid(row=0, column=0, sticky="nsew")
         
         # Title
         title_label = ttk.Label(main_frame, text="SPP Metric Automation Tool", 
@@ -60,7 +60,7 @@ class SPPAutomationGUI:
         # Configuration File
         ttk.Label(main_frame, text="Config File:").grid(row=7, column=0, sticky=tk.W, pady=5)
         config_frame = ttk.Frame(main_frame)
-        config_frame.grid(row=7, column=1, pady=5, padx=(10, 0), sticky=(tk.W, tk.E))
+        config_frame.grid(row=7, column=1, pady=5, padx=(10, 0), sticky="we")
         
         self.config_entry = ttk.Entry(config_frame, width=40)
         self.config_entry.grid(row=0, column=0, padx=(0, 5))
@@ -85,7 +85,7 @@ class SPPAutomationGUI:
         
         # Progress bar
         self.progress = ttk.Progressbar(main_frame, mode='indeterminate')
-        self.progress.grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        self.progress.grid(row=9, column=0, columnspan=2, sticky="we", pady=10)
         
         # Status text
         self.status_text = tk.Text(main_frame, height=10, width=70)
@@ -93,7 +93,7 @@ class SPPAutomationGUI:
         
         # Scrollbar for status text
         scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=self.status_text.yview)
-        scrollbar.grid(row=10, column=2, sticky=(tk.N, tk.S))
+        scrollbar.grid(row=10, column=2, sticky="ns")
         self.status_text.configure(yscrollcommand=scrollbar.set)
         
         # Configure grid weights
