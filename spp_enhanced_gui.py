@@ -501,7 +501,8 @@ class SPPEnhancedGUI:
         # Keep the sanitized email for downstream use
         self.user_email = email
         self.log_message(f"Authenticating user: {email}")
-        self.auth_status.config(text="Authenticating...", foreground=self.colors['info_blue'])
+        self.auth_status.config(text="⏳ Authenticating...", foreground=self.colors['info_blue'])
+        self.root.update()
         
         # Run authentication in background
         threading.Thread(target=self._authenticate_thread, daemon=True).start()
@@ -515,16 +516,40 @@ class SPPEnhancedGUI:
             # Use the sanitized email captured during authenticate_user
             if not self.user_email:
                 self.user_email = self._sanitize_email(self.email_var.get())
+            
+            self.log_message(f"Creating automation instance for {self.user_email}")
             self.automation = SPPAutomationEnhanced(user_email=self.user_email)
             
-            success, message = self.automation.test_connection()
+            self.log_message("Attempting Snowflake connection...")
+            # Use direct connection instead of test_connection for better error handling
+            success = self.automation.connect_to_snowflake()
             
-            # Update UI in main thread
-            self.root.after(0, self._handle_auth_result, success, message)
+            if success:
+                message = f"Successfully authenticated as {self.user_email}"
+                self.root.after(0, self._handle_auth_result, True, message)
+            else:
+                message = ("Failed to authenticate with Snowflake.\n\n"
+                          "Please ensure:\n"
+                          "1. You completed the browser authentication\n"
+                          "2. Your VPN is connected (if required)\n"
+                          "3. You have access to the DM_SUPPLYCHAIN database")
+                self.root.after(0, self._handle_auth_result, False, message)
             
         except Exception as e:
-            error_msg = f"Authentication failed: {str(e)}"
-            self.root.after(0, self._handle_auth_result, False, error_msg)
+            error_msg = str(e)
+            self.log_message(f"Authentication error: {error_msg}")
+            
+            # Provide more specific error messages
+            if "timeout" in error_msg.lower():
+                message = ("Authentication timed out.\n\n"
+                          "Please try again and complete the browser authentication promptly.")
+            elif "browser" in error_msg.lower():
+                message = ("Failed to complete browser authentication.\n\n"
+                          "Please ensure your default browser is accessible.")
+            else:
+                message = f"Authentication failed:\n{error_msg}"
+            
+            self.root.after(0, self._handle_auth_result, False, message)
     
     def _handle_auth_result(self, success, message):
         """Handle authentication result."""
@@ -532,10 +557,12 @@ class SPPEnhancedGUI:
             self.authenticated = True
             self.auth_status.config(text="✓ Authenticated", foreground=self.colors['success_green'])
             self.log_message(f"✓ Authentication successful: {message}")
+            messagebox.showinfo("Authentication Success", message)
         else:
             self.authenticated = False
             self.auth_status.config(text="✗ Failed", foreground=self.colors['error_red'])
             self.log_message(f"✗ Authentication failed: {message}")
+            messagebox.showerror("Authentication Failed", message)
     
     def test_connection(self):
         """Test Snowflake connection."""

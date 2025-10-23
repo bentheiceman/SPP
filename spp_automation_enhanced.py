@@ -127,18 +127,36 @@ class SPPAutomationEnhanced:
                 insecure_mode=True
             )
             
-            # Set database context after connection
+            # Verify connection is established
+            if not self.connection:
+                self.logger.error("Connection object is None after connect attempt")
+                return False
+            
+            # Test the connection with a simple query
             cursor = self.connection.cursor()
-            cursor.execute("USE DATABASE DM_SUPPLYCHAIN")
-            cursor.execute("USE WAREHOUSE WH_SUPPLYCHAIN_ANALYST_XSMALL")
-            cursor.execute("USE ROLE SUPPLYCHAIN_ANALYST")
-            cursor.close()
+            try:
+                cursor.execute("SELECT CURRENT_USER()")
+                result = cursor.fetchone()
+                if result:
+                    self.logger.info(f"Successfully authenticated as: {result[0]}")
+                
+                # Set database context after successful authentication
+                cursor.execute("USE DATABASE DM_SUPPLYCHAIN")
+                cursor.execute("USE WAREHOUSE WH_SUPPLYCHAIN_ANALYST_XSMALL")
+                cursor.execute("USE ROLE SUPPLYCHAIN_ANALYST")
+                self.logger.info("Database context set successfully")
+                
+            finally:
+                cursor.close()
             
             self.logger.info("Successfully connected to Snowflake and set context")
             return True
             
         except Exception as e:
             self.logger.error(f"Failed to connect to Snowflake: {e}")
+            # Log more details about the error
+            self.logger.error(f"Error type: {type(e).__name__}")
+            self.logger.error(f"Error details: {str(e)}")
             return False
     
     def get_query_0_summary_metrics(self, vendor_numbers: List[str], report_month: str, date_filter: str) -> str:
