@@ -231,7 +231,7 @@ class SPPEnhancedGUI:
         
         ttk.Label(header_frame, text="SPP Metric Automation Tool", 
                  style='Header.TLabel').pack()
-        ttk.Label(header_frame, text="Enhanced Version with Template Configuration", 
+        ttk.Label(header_frame, text="Enhanced Version v2.2 with Template Configuration", 
                  style='Subtitle.TLabel').pack()
         
         # Authentication Section

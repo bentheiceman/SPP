@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced Build Script for SPP Automation Tool
+Enhanced Build Script for SPP Automation Tool v2.2
 Creates a self-contained executable with all dependencies and deployment package.
 """
 
@@ -45,7 +45,7 @@ def cleanup_old_artifacts():
         Path('build'),
         Path('dist'),
         Path('SPP_Enhanced_Deployment'),
-        Path('SPP_Enhanced_v2.0_Team_Deployment'),
+        Path('SPP_Enhanced_v2.2_Team_Deployment'),
     ]
     for d in dirs_to_remove:
         try:
@@ -257,12 +257,12 @@ VSVersionInfo(
         u'040904B0',
         [StringStruct(u'CompanyName', u'HD Supply Chain Excellence'),
         StringStruct(u'FileDescription', u'SPP Metric Automation Tool Enhanced'),
-        StringStruct(u'FileVersion', u'2.0.0.0'),
+        StringStruct(u'FileVersion', u'2.2.0.0'),
         StringStruct(u'InternalName', u'SPP_Automation_Tool_Enhanced'),
         StringStruct(u'LegalCopyright', u'Copyright (c) 2025 HD Supply. All rights reserved.'),
         StringStruct(u'OriginalFilename', u'SPP_Automation_Tool_Enhanced.exe'),
         StringStruct(u'ProductName', u'SPP Metric Automation Tool Enhanced'),
-        StringStruct(u'ProductVersion', u'2.0.0.0'),
+        StringStruct(u'ProductVersion', u'2.2.0.0'),
         StringStruct(u'Developer', u'Ben F. Benjamaa'),
         StringStruct(u'Manager', u'Lauren B. Trapani')])
       ]),
@@ -390,7 +390,7 @@ def create_enhanced_deployment_package():
         
         # Create deployment directory
         # Standard team deployment folder name
-        deployment_dir = Path("SPP_Enhanced_v2.0_Team_Deployment")
+        deployment_dir = Path("SPP_Enhanced_v2.2_Team_Deployment")
         if deployment_dir.exists():
             shutil.rmtree(deployment_dir)
         deployment_dir.mkdir()
@@ -423,13 +423,16 @@ def create_enhanced_deployment_package():
             json.dump(template_config, f, indent=2)
         
         # Create comprehensive README
-        readme_content = """# SPP Metric Automation Tool Enhanced v2.0
+        readme_content = """# SPP Metric Automation Tool Enhanced v2.2
 ## HD Supply Chain Excellence
 
 ### Overview
 The SPP Metric Automation Tool Enhanced provides advanced reporting capabilities with user-configurable Excel templates, comprehensive error handling, and an intuitive interface.
 
-### New Features in v2.0
+### New Features in v2.2
+- **Multi-Statement SQL Support**: Handles USE DATABASE + SELECT queries seamlessly
+- **Vendor Part Number Tracking**: Added manufacturer part numbers to all detailed tabs
+- **Enhanced Compliance Tracking**: Compliant/Non-Compliant indicators across all tabs
 - **User-Configurable Templates**: Link your own Excel template files for consistent formatting
 - **Template Auto-Discovery**: Automatic search in common locations (OneDrive, Documents)
 - **Dual Output Modes**: Standard Excel (.xlsx) or Macro-Enabled (.xlsm) formats
@@ -506,10 +509,16 @@ If no template is found, the tool automatically creates a standard Excel file wi
 - **Developer**: Ben F. Benjamaa
 - **Manager**: Lauren B. Trapani
 - **Department**: HD Supply Chain Excellence
-- **Version**: 2.0.0 Enhanced
+- **Version**: 2.2.0 Enhanced
 - **Build Date**: """ + datetime.now().strftime("%Y-%m-%d") + """
 
 ### Change Log
+#### Version 2.2.0 (Enhanced)
+- Multi-statement SQL execution support (USE DATABASE + SELECT)
+- Vendor part number tracking in all detailed tabs
+- Enhanced compliance indicators
+- Fixed statement count mismatch error
+
 #### Version 2.0.0 (Enhanced)
 - Added user-configurable template system
 - Implemented template auto-discovery
@@ -650,7 +659,7 @@ auto_open_results = true
         
         # Create ZIP package
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        zip_name = f"SPP_Automation_Tool_Enhanced_v2.0_{timestamp}.zip"
+        zip_name = f"SPP_Automation_Tool_Enhanced_v2.2_{timestamp}.zip"
 
         with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
             for root, dirs, files in os.walk(deployment_dir):
@@ -673,7 +682,7 @@ auto_open_results = true
 def main():
     """Main build process."""
     print("=" * 60)
-    print("SPP Automation Tool Enhanced - Build Script v2.0")
+    print("SPP Automation Tool Enhanced - Build Script v2.2")
     print("HD Supply Chain Excellence")
     print("=" * 60)
     

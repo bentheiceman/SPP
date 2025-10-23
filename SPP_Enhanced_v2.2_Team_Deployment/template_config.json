@@ -1,0 +1,12 @@
+{
+  "template_path": "",
+  "use_template": false,
+  "template_name": "SPP_Template.xlsm",
+  "output_format": "xlsx",
+  "search_paths": [
+    "C:\\\\Users\\\\%USERNAME%\\\\OneDrive\\\\Documents",
+    "C:\\\\Users\\\\%USERNAME%\\\\Documents",
+    "."
+  ],
+  "last_updated": "2025-10-23T14:46:11.161640"
+}
