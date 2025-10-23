@@ -119,17 +119,22 @@ class SPPAutomationEnhanced:
         try:
             self.logger.info(f"Connecting to Snowflake with user: {self.user_email}")
             
+            # Use EXACT same parameters that work in the test script
             self.connection = snowflake.connector.connect(
-                account='HDSUPPLY-DATA',
                 user=self.user_email,
+                account='HDSUPPLY-DATA',
                 authenticator='externalbrowser',
-                database='DM_SUPPLYCHAIN',  # Set default database context
-                warehouse='WH_SUPPLYCHAIN_ANALYST_XSMALL',
-                role='SUPPLYCHAIN_ANALYST',
                 insecure_mode=True
             )
             
-            self.logger.info("Successfully connected to Snowflake with database context set")
+            # Set database context after connection
+            cursor = self.connection.cursor()
+            cursor.execute("USE DATABASE DM_SUPPLYCHAIN")
+            cursor.execute("USE WAREHOUSE WH_SUPPLYCHAIN_ANALYST_XSMALL")
+            cursor.execute("USE ROLE SUPPLYCHAIN_ANALYST")
+            cursor.close()
+            
+            self.logger.info("Successfully connected to Snowflake and set context")
             return True
             
         except Exception as e:
@@ -655,23 +660,26 @@ WHERE IH.MANDT = '300'
     def test_connection(self) -> Tuple[bool, str]:
         """Test Snowflake connection."""
         try:
-            if self.connect_to_snowflake():
-                if not self.connection:
-                    return False, "Connection object is None"
-                    
-                # Test with a simple query
-                cursor = self.connection.cursor()
-                cursor.execute("SELECT CURRENT_VERSION()")
-                result = cursor.fetchone()
-                cursor.close()
-                self.connection.close()
-                
-                if result:
-                    return True, f"Connection successful. Snowflake version: {result[0]}"
-                else:
-                    return False, "No result from test query"
+            # Use EXACT same connection parameters as the working test script
+            test_conn = snowflake.connector.connect(
+                user=self.user_email,
+                account='HDSUPPLY-DATA',
+                authenticator='externalbrowser',
+                insecure_mode=True
+            )
+            
+            # Test with a simple query
+            cursor = test_conn.cursor()
+            cursor.execute("SELECT CURRENT_VERSION()")
+            result = cursor.fetchone()
+            cursor.close()
+            test_conn.close()
+            
+            if result:
+                return True, f"Connection successful. Snowflake version: {result[0]}"
             else:
-                return False, "Failed to establish connection"
+                return False, "No result from test query"
+                
         except Exception as e:
             return False, f"Connection test failed: {str(e)}"
     
