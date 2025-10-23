@@ -366,15 +366,28 @@ WHERE IH.MANDT = '300'
                 
             self.logger.info("Executing Snowflake query...")
             cursor = self.connection.cursor()
+            
+            # Execute query - may contain multiple statements (e.g., USE DATABASE + SELECT)
             cursor.execute(query)
             
-            # Get column names
-            columns = [desc[0] for desc in cursor.description]
+            # Initialize variables
+            columns = []
+            data = []
             
-            # Fetch data
-            data = cursor.fetchall()
+            # If there are multiple statements, we need to get the last result set
+            # The USE DATABASE statement returns no data, so we skip to the actual query result
+            while True:
+                if cursor.description:  # This result set has data
+                    # Get column names
+                    columns = [desc[0] for desc in cursor.description]
+                    # Fetch data
+                    data = cursor.fetchall()
+                
+                # Try to move to next result set
+                if not cursor.nextset():
+                    break
             
-            # Create DataFrame
+            # Create DataFrame from the last result set with data
             df = pd.DataFrame(data, columns=columns)
             
             self.logger.info(f"Query executed successfully. Retrieved {len(df)} rows.")
