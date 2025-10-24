@@ -526,9 +526,6 @@ class SPPEnhancedGUI:
 
             if success:
                 detail_message = self.automation.last_error or "Successfully authenticated with Snowflake."
-                if self.automation.context_warnings:
-                    warnings_text = "\n".join(self.automation.context_warnings)
-                    detail_message += f"\n\nWarnings:\n{warnings_text}"
                 self.root.after(0, self._handle_auth_result, True, detail_message)
             else:
                 failure_detail = self.automation.last_error or (

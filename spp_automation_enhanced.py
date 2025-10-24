@@ -232,16 +232,12 @@ class SPPAutomationEnhanced:
                         self.logger.info("Context set: %s", description)
                     except Exception as context_error:
                         warning_msg = f"Unable to set {description}: {context_error}"
-                        self.context_warnings.append(warning_msg)
                         self.logger.warning(warning_msg)
 
             finally:
                 cursor.close()
 
-            if self.context_warnings:
-                self.last_error = "Authenticated with warnings: " + "; ".join(self.context_warnings)
-            else:
-                self.last_error = ""
+            self.last_error = ""
 
             self.logger.info("Snowflake connection established successfully")
             return True
