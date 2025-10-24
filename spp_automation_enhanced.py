@@ -11,7 +11,8 @@ import os
 import logging
 import shutil
 import json
-from typing import List, Optional, Dict, Tuple
+import configparser
+from typing import List, Optional, Dict, Tuple, Any
 from datetime import datetime
 import re
 import openpyxl
@@ -28,19 +29,24 @@ class SPPAutomationEnhanced:
         self.logger = self.setup_logging()
         self.template_config_file = "template_config.json"
         self.template_config = self.load_template_config()
+        self.snowflake_config = self.load_snowflake_config()
+        self.last_error: str = ""
+        self.context_warnings: List[str] = []
         
     def setup_logging(self):
         """Set up logging configuration."""
-        log_file = f"spp_automation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        log_path = Path.cwd() / f"spp_automation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        self.log_file = str(log_path)
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
+                logging.FileHandler(self.log_file, encoding='utf-8'),
                 logging.StreamHandler()
-            ]
+            ],
+            force=True
         )
-        return logging.getLogger(__name__)
+        return logging.getLogger("spp_automation")
     
     def load_template_config(self) -> Dict:
         """Load template configuration from JSON file."""
@@ -72,6 +78,42 @@ class SPPAutomationEnhanced:
         except Exception as e:
             self.logger.warning(f"Error loading template config: {e}. Using defaults.")
             return default_config
+
+    def load_snowflake_config(self) -> Dict[str, Any]:
+        """Load Snowflake connection settings from config.ini with sensible defaults."""
+        defaults: Dict[str, Any] = {
+            "account": "HDSUPPLY-DATA",
+            "user": self.user_email or "",
+            "authenticator": "externalbrowser",
+            "insecure_mode": True,
+            "warehouse": "WH_SUPPLYCHAIN_ANALYST_XSMALL",
+            "database": "DM_SUPPLYCHAIN",
+            "role": "SUPPLYCHAIN_ANALYST",
+            "schema": ""
+        }
+
+        parser = configparser.ConfigParser()
+        if os.path.exists(self.config_file):
+            try:
+                parser.read(self.config_file)
+                if parser.has_section("SNOWFLAKE"):
+                    section = parser["SNOWFLAKE"]
+                    for key in ("account", "user", "authenticator", "warehouse", "database", "role", "schema"):
+                        value = section.get(key, "").strip()
+                        if value:
+                            defaults[key] = value
+                    if section.get("insecure_mode", "").strip():
+                        defaults["insecure_mode"] = section.getboolean("insecure_mode", fallback=True)
+            except Exception as exc:
+                self.logger.warning(f"Error loading Snowflake config: {exc}. Using defaults.")
+
+        # Ensure the object has a user email for downstream logging / prompts
+        if self.user_email:
+            defaults["user"] = self.user_email
+        elif defaults["user"]:
+            self.user_email = defaults["user"]
+
+        return defaults
     
     def save_template_config(self, config: Dict) -> None:
         """Save template configuration to JSON file."""
@@ -117,46 +159,97 @@ class SPPAutomationEnhanced:
     def connect_to_snowflake(self) -> bool:
         """Connect to Snowflake using external browser authentication."""
         try:
-            self.logger.info(f"Connecting to Snowflake with user: {self.user_email}")
-            
-            # Use EXACT same parameters that work in the test script
-            self.connection = snowflake.connector.connect(
-                user=self.user_email,
-                account='HDSUPPLY-DATA',
-                authenticator='externalbrowser',
-                insecure_mode=True
-            )
-            
-            # Verify connection is established
-            if not self.connection:
-                self.logger.error("Connection object is None after connect attempt")
+            settings = self.snowflake_config.copy()
+            self.last_error = ""
+            self.context_warnings = []
+
+            user = self.user_email or settings.get("user")
+            if not user:
+                self.last_error = "HD Supply email address is required for Snowflake authentication."
+                self.logger.error(self.last_error)
                 return False
-            
-            # Test the connection with a simple query
+
+            account = settings.get("account", "HDSUPPLY-DATA")
+            authenticator = settings.get("authenticator", "externalbrowser")
+            insecure_mode = settings.get("insecure_mode", True)
+
+            self.logger.info(
+                "Connecting to Snowflake | user=%s account=%s authenticator=%s insecure_mode=%s",
+                user,
+                account,
+                authenticator,
+                insecure_mode,
+            )
+
+            connect_kwargs = {
+                "user": user,
+                "account": account,
+                "authenticator": authenticator,
+                "insecure_mode": insecure_mode,
+                "login_timeout": 120,
+            }
+
+            self.connection = snowflake.connector.connect(**connect_kwargs)
+
+            if not self.connection:
+                self.last_error = "Snowflake connection returned None." \
+                    " Please try authenticating again."
+                self.logger.error(self.last_error)
+                return False
+
             cursor = self.connection.cursor()
             try:
-                cursor.execute("SELECT CURRENT_USER()")
-                result = cursor.fetchone()
-                if result:
-                    self.logger.info(f"Successfully authenticated as: {result[0]}")
-                
-                # Set database context after successful authentication
-                cursor.execute("USE DATABASE DM_SUPPLYCHAIN")
-                cursor.execute("USE WAREHOUSE WH_SUPPLYCHAIN_ANALYST_XSMALL")
-                cursor.execute("USE ROLE SUPPLYCHAIN_ANALYST")
-                self.logger.info("Database context set successfully")
-                
+                cursor.execute("SELECT CURRENT_USER(), CURRENT_ACCOUNT(), CURRENT_ROLE()")
+                current_details = cursor.fetchone()
+                if current_details:
+                    self.logger.info(
+                        "Authenticated as user=%s | account=%s | role=%s",
+                        current_details[0],
+                        current_details[1],
+                        current_details[2],
+                    )
+
+                context_commands = []
+                if settings.get("database"):
+                    context_commands.append((
+                        f"USE DATABASE {settings['database']}",
+                        f"database {settings['database']}"
+                    ))
+                if settings.get("warehouse"):
+                    context_commands.append((
+                        f"USE WAREHOUSE {settings['warehouse']}",
+                        f"warehouse {settings['warehouse']}"
+                    ))
+                if settings.get("role"):
+                    context_commands.append((
+                        f"USE ROLE {settings['role']}",
+                        f"role {settings['role']}"
+                    ))
+
+                for command, description in context_commands:
+                    try:
+                        cursor.execute(command)
+                        self.logger.info("Context set: %s", description)
+                    except Exception as context_error:
+                        warning_msg = f"Unable to set {description}: {context_error}"
+                        self.context_warnings.append(warning_msg)
+                        self.logger.warning(warning_msg)
+
             finally:
                 cursor.close()
-            
-            self.logger.info("Successfully connected to Snowflake and set context")
+
+            if self.context_warnings:
+                self.last_error = "Authenticated with warnings: " + "; ".join(self.context_warnings)
+            else:
+                self.last_error = ""
+
+            self.logger.info("Snowflake connection established successfully")
             return True
-            
+
         except Exception as e:
-            self.logger.error(f"Failed to connect to Snowflake: {e}")
-            # Log more details about the error
-            self.logger.error(f"Error type: {type(e).__name__}")
-            self.logger.error(f"Error details: {str(e)}")
+            self.last_error = f"Failed to connect to Snowflake: {e}"
+            self.logger.error(self.last_error)
+            self.logger.error("Error type: %s", type(e).__name__)
             return False
     
     def get_query_0_summary_metrics(self, vendor_numbers: List[str], report_month: str, date_filter: str) -> str:
@@ -164,7 +257,7 @@ class SPPAutomationEnhanced:
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
-WITH Metric_Data AS (
+WITH Metric_Data AS 
     SELECT
         RPT_MONTH,
         VENDOR_NUMBER,
@@ -175,13 +268,13 @@ WITH Metric_Data AS (
             When Metric Like 'Units_On_Time_Complete' Then '3.Units_On_Time_Complete'
         End As MetricType,
         TO_CHAR((SUM(METRIC_NUMERATOR)/SUM(METRIC_DENOMINATOR)) * 100, 'FM999.9') || '%' AS Metric_Percentage
-    FROM VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
     WHERE 
         VENDOR_NUMBER IN ('{vendor_filter}')  -- Metric Data Vendor Filter
         AND RPT_MONTH like '{report_month}' -- Metric Data Month Filter
         AND METRIC IN ('First_Receipt_FR_B1D', 'First_Receipt_FR_B28D', 'Units_On_Time_Complete')
     GROUP BY RPT_MONTH, VENDOR_NUMBER, VENDOR_NAME, MetricType
-),
+,
 
 ASN_Data AS (
     SELECT
@@ -261,7 +354,7 @@ WITH primary_metric AS (
         METRIC_NUMERATOR,
         METRIC_DENOMINATOR,
         NETWORK
-    FROM VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
+    FROM DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE
     WHERE 
         VENDOR_NUMBER IN ('{vendor_filter}') -- Supplier Filter
         AND RPT_MONTH LIKE '{report_month}' -- Month Filter
@@ -274,7 +367,7 @@ hds_receipts AS (
         MAX(TRY_TO_DATE(TO_CHAR(e.budat), 'yyyymmdd')) AS receipt_date,
         a.MIC
     FROM EDP.STD_ECC.EKBE e
-    LEFT JOIN IA_ATLAS.ATLAS a
+    LEFT JOIN DM_SUPPLYCHAIN.IA_ATLAS.ATLAS a
         ON LTRIM(e.MATNR, '0') = LTRIM(a.MATERIAL, '0')
     WHERE e.bwart IN ('101', '102')
     GROUP BY e.ebeln, e.MATNR, a.MIC
@@ -285,7 +378,7 @@ hdp_receipts AS (
         CONCAT(PO_NUMBER, ':', USN) AS Metric_Concatenate,
         MAX(TO_DATE(DATE_RECEIVED)) AS receipt_date,
         MANUFACTURER_PART_NUMBER AS MIC
-    FROM PRO_INVENTORY_ANALYTICS.REPORT_PURCHASE_ORDER_VISIBILITY_SHIPMENTS
+    FROM DM_SUPPLYCHAIN.PRO_INVENTORY_ANALYTICS.REPORT_PURCHASE_ORDER_VISIBILITY_SHIPMENTS
     GROUP BY PO_NUMBER, USN, MANUFACTURER_PART_NUMBER
 ),
 

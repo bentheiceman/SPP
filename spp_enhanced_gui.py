@@ -523,17 +523,22 @@ class SPPEnhancedGUI:
             self.log_message("Attempting Snowflake connection...")
             # Use direct connection instead of test_connection for better error handling
             success = self.automation.connect_to_snowflake()
-            
+
             if success:
-                message = f"Successfully authenticated as {self.user_email}"
-                self.root.after(0, self._handle_auth_result, True, message)
+                detail_message = self.automation.last_error or "Successfully authenticated with Snowflake."
+                if self.automation.context_warnings:
+                    warnings_text = "\n".join(self.automation.context_warnings)
+                    detail_message += f"\n\nWarnings:\n{warnings_text}"
+                self.root.after(0, self._handle_auth_result, True, detail_message)
             else:
-                message = ("Failed to authenticate with Snowflake.\n\n"
-                          "Please ensure:\n"
-                          "1. You completed the browser authentication\n"
-                          "2. Your VPN is connected (if required)\n"
-                          "3. You have access to the DM_SUPPLYCHAIN database")
-                self.root.after(0, self._handle_auth_result, False, message)
+                failure_detail = self.automation.last_error or (
+                    "Failed to authenticate with Snowflake.\n\n"
+                    "Please ensure:\n"
+                    "1. You completed the browser authentication\n"
+                    "2. Your VPN is connected (if required)\n"
+                    "3. You have access to the DM_SUPPLYCHAIN database"
+                )
+                self.root.after(0, self._handle_auth_result, False, failure_detail)
             
         except Exception as e:
             error_msg = str(e)
