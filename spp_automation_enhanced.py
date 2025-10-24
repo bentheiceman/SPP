@@ -257,7 +257,7 @@ class SPPAutomationEnhanced:
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
-WITH Metric_Data AS 
+WITH Metric_Data AS (
     SELECT
         RPT_MONTH,
         VENDOR_NUMBER,
@@ -274,7 +274,7 @@ WITH Metric_Data AS
         AND RPT_MONTH like '{report_month}' -- Metric Data Month Filter
         AND METRIC IN ('First_Receipt_FR_B1D', 'First_Receipt_FR_B28D', 'Units_On_Time_Complete')
     GROUP BY RPT_MONTH, VENDOR_NUMBER, VENDOR_NAME, MetricType
-,
+),
 
 ASN_Data AS (
     SELECT

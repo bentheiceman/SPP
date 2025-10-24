@@ -1,0 +1,33 @@
+2025-10-23 22:01:48,325 - INFO - Attempting Snowflake connection...
+2025-10-23 22:01:48,325 - INFO - Connecting to Snowflake | user=benf.benjamaa@hdsupply.com account=HDSUPPLY-DATA authenticator=externalbrowser insecure_mode=True
+2025-10-23 22:01:48,325 - INFO - Snowflake Connector for Python Version: 3.17.1, Python Version: 3.10.11, Platform: Windows-10-10.0.26100-SP0
+2025-10-23 22:01:48,325 - INFO - Connecting to GLOBAL Snowflake domain
+2025-10-23 22:01:48,325 - WARNING - Dependency 'keyring' is not installed, cannot cache id token. You might experience multiple authentication pop ups while using ExternalBrowser/OAuth/MFA Authenticator. To avoid this please install keyring module using the following command:
+ pip install snowflake-connector-python[secure-local-storage]
+2025-10-23 22:01:48,773 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x0000022529128280>: Failed to establish a new connection: [WinError 10051] A socket operation was attempted to an unreachable network')': /metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com
+2025-10-23 22:01:48,789 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x00000225291286A0>: Failed to establish a new connection: [WinError 10051] A socket operation was attempted to an unreachable network')': /metadata/instance?api-version=2021-02-01
+2025-10-23 22:01:48,805 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x0000022529128AF0>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed')': /
+2025-10-23 22:01:48,805 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x0000022529128F40>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed')': /computeMetadata/v1/instance/service-accounts/default/email
+2025-10-23 22:01:53,232 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x000002252912A050>: Failed to establish a new connection: [WinError 10051] A socket operation was attempted to an unreachable network')': /metadata/instance?api-version=2021-02-01
+2025-10-23 22:01:53,266 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x000002252912A890>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed')': /
+2025-10-23 22:01:53,266 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x000002252912AE00>: Failed to establish a new connection: [Errno 11001] getaddrinfo failed')': /computeMetadata/v1/instance/service-accounts/default/email
+2025-10-23 22:01:53,266 - WARNING - Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'NewConnectionError('<snowflake.connector.vendored.urllib3.connection.HTTPConnection object at 0x00000225290D0A30>: Failed to establish a new connection: [WinError 10051] A socket operation was attempted to an unreachable network')': /metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com
+2025-10-23 22:01:53,680 - WARNING - Dependency 'keyring' is not installed, cannot cache id token. You might experience multiple authentication pop ups while using ExternalBrowser/OAuth/MFA Authenticator. To avoid this please install keyring module using the following command:
+ pip install snowflake-connector-python[secure-local-storage]
+2025-10-23 22:01:53,993 - INFO - Authenticated as user=BENF.BENJAMAA@HDSUPPLY.COM | account=DATA | role=HDS-EDP-SUPPLYCHAIN-DEVELOPER-U0
+2025-10-23 22:01:54,202 - INFO - Context set: database DM_SUPPLYCHAIN
+2025-10-23 22:01:54,325 - WARNING - Unable to set warehouse WH_SUPPLYCHAIN_ANALYST_XSMALL: 002043 (02000): 01bfea19-0006-d0fb-0109-f202345c89c3: SQL compilation error:
+Object does not exist, or operation cannot be performed.
+2025-10-23 22:01:54,509 - WARNING - Unable to set role SUPPLYCHAIN_ANALYST: 002043 (02000): 01bfea19-0006-cf29-0109-f202345c6ca7: SQL compilation error:
+Object does not exist, or operation cannot be performed.
+2025-10-23 22:01:54,509 - INFO - Snowflake connection established successfully
+2025-10-23 22:01:54,540 - INFO - ✓ Authentication successful: Authenticated with warnings: Unable to set warehouse WH_SUPPLYCHAIN_ANALYST_XSMALL: 002043 (02000): 01bfea19-0006-d0fb-0109-f202345c89c3: SQL compilation error:
+Object does not exist, or operation cannot be performed.; Unable to set role SUPPLYCHAIN_ANALYST: 002043 (02000): 01bfea19-0006-cf29-0109-f202345c6ca7: SQL compilation error:
+Object does not exist, or operation cannot be performed.
+
+Warnings:
+Unable to set warehouse WH_SUPPLYCHAIN_ANALYST_XSMALL: 002043 (02000): 01bfea19-0006-d0fb-0109-f202345c89c3: SQL compilation error:
+Object does not exist, or operation cannot be performed.
+Unable to set role SUPPLYCHAIN_ANALYST: 002043 (02000): 01bfea19-0006-cf29-0109-f202345c6ca7: SQL compilation error:
+Object does not exist, or operation cannot be performed.
+2025-10-23 22:02:00,394 - INFO - Application closing
