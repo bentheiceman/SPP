@@ -1,8 +1,82 @@
 """
-SPP Metric Automation - Enhanced Version v2.2 with User-Configurable Templates
-Complete Multi-Tab Implementation with flexible template system.
-        METRIC,eloper: Ben F. Benjamaa
+SPP Metric Automation - Enhanced Version v3.0 with PDH Compliance
+================================================================================
+
+This module provides automated Supplier Performance (SPP) reporting capabilities
+for HD Supply Chain Excellence team. It generates comprehensive multi-tab Excel
+reports with vendor performance metrics, ASN data, and PDH compliance tracking.
+
+Key Features:
+------------
+- **4-Tab Reporting**: Summary Metrics, Basic Metrics, ASN Data, PDH Compliance
+- **Snowflake Integration**: Direct cloud data warehouse connectivity
+- **Template Support**: User-configurable Excel templates (.xlsx, .xlsm)
+- **Multi-Vendor**: Process multiple vendors in single or batch operations
+- **Browser Authentication**: Secure SSO via external browser
+- **Rolling 28-Day Filter**: PDH compliance tracking with time-based filtering
+
+Report Tabs:
+-----------
+1. **Tab1 - Summary Metrics**: High-level KPIs with percentage calculations
+   - Shipments In Full (1 Day)
+   - Inbound Fill Rate (28 Days)
+   - Units On Time Complete
+   - ASN Success Rate
+
+2. **Tab2 - Basic Metrics**: Line-level performance data
+   - PO and receipt tracking
+   - Vendor part numbers (MIC)
+   - Compliance status per line item
+
+3. **Tab3 - ASN Data**: Advance Shipping Notice compliance
+   - Delivery tracking (ASN vs EGR vs Manual)
+   - Carrier information and BOL data
+   - Create dates and quantities
+
+4. **Tab4 - PDH Compliance**: Product Data Hub audit tracking (NEW in v3.0)
+   - Request/response tracking with timestamps
+   - Days since request calculations
+   - Compliance labels (Compliant/Non-Compliant)
+   - Supplier action status
+   - Rolling 28-day filter
+
+Technical Details:
+-----------------
+- **Database**: Snowflake Cloud Data Warehouse
+- **Authentication**: External Browser SSO
+- **Output Formats**: Excel (.xlsx) or Macro-Enabled Excel (.xlsm)
+- **Dependencies**: pandas, snowflake-connector-python, openpyxl
+- **Configuration**: config.ini for Snowflake, template_config.json for templates
+
+Usage Example:
+-------------
+```python
+# Initialize automation with user email
+automation = SPPAutomationEnhanced(user_email="user@hdsupply.com")
+
+# Configure template (optional)
+automation.update_template_config(
+    template_path="path/to/template.xlsm",
+    use_template=True,
+    output_format="xlsm"
+)
+
+# Run automation for single or multiple vendors
+output_path, status = automation.run_full_automation(
+    vendor_numbers=["13479", "52889"],
+    report_month="FY2026-JAN",
+    date_filter="202601"
+)
+
+print(f"Report created: {output_path}")
+print(f"Status: {status}")
+```
+
+Developer: Ben F. Benjamaa
 Manager: Lauren B. Trapani
+Team: HD Supply Chain Excellence
+Version: 3.0
+Release Date: January 7, 2026
 """
 
 import pandas as pd
@@ -20,21 +94,96 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from pathlib import Path
 
 class SPPAutomationEnhanced:
-    """Enhanced SPP Metric Automation with user-configurable templates and full multi-tab support."""
+    """
+    Enhanced SPP Metric Automation Engine with PDH Compliance Tracking.
+    
+    This class handles the complete automation workflow for Supplier Performance
+    reporting, including database connectivity, query execution, data processing,
+    and Excel file generation with multiple tabs.
+    
+    Attributes:
+        config_file (str): Path to configuration file for Snowflake settings
+        user_email (str): HD Supply email address for authentication
+        connection (snowflake.connector.SnowflakeConnection): Active database connection
+        logger (logging.Logger): Logger instance for activity tracking
+        template_config (Dict): Configuration for Excel template usage
+        snowflake_config (Dict): Snowflake connection parameters
+        last_error (str): Most recent error message for debugging
+        context_warnings (List[str]): Collection of non-fatal warnings
+    
+    Key Methods:
+        - connect_to_snowflake(): Establish authenticated database connection
+        - get_query_0_summary_metrics(): Generate summary KPIs query
+        - get_query_1_basic_metrics(): Generate line-level metrics query
+        - get_query_2_asn_data(): Generate ASN compliance query
+        - get_query_3_pdh_compliance(): Generate PDH audit query (v3.0)
+        - run_full_automation(): Execute complete automation workflow
+        - create_standard_excel_file(): Create Excel output without template
+        - populate_template_tabs(): Populate user-provided template
+    
+    Thread Safety:
+        This class is not thread-safe. Each automation run should use a separate
+        instance to avoid connection and state conflicts.
+    
+    Error Handling:
+        All methods return tuples with success status and descriptive messages.
+        Errors are logged to both file and console with full stack traces.
+    """
     
     def __init__(self, config_file: str = "config.ini", user_email: Optional[str] = None):
-        self.config_file = config_file
-        self.user_email = user_email
-        self.connection: Optional[snowflake.connector.SnowflakeConnection] = None
+        """
+        Initialize the SPP Automation engine with configuration and user credentials.
+        
+        Args:
+            config_file (str): Path to Snowflake configuration file. Defaults to "config.ini"
+            user_email (Optional[str]): HD Supply email address for authentication.
+                                       If None, will attempt to load from config file.
+        
+        The constructor initializes:
+        - Logging infrastructure with file and console output
+        - Template configuration for Excel output customization
+        - Snowflake connection parameters from config file
+        - Error tracking and warning collection
+        """
+        # Core configuration
+        self.config_file = config_file  # Path to Snowflake settings (config.ini)
+        self.user_email = user_email  # User's HD Supply email for authentication
+        self.connection: Optional[snowflake.connector.SnowflakeConnection] = None  # Active Snowflake connection
+        
+        # Initialize logging system (creates timestamped log file)
         self.logger = self.setup_logging()
-        self.template_config_file = "template_config.json"
-        self.template_config = self.load_template_config()
+        
+        # Template configuration for Excel output customization
+        self.template_config_file = "template_config.json"  # Template settings file
+        self.template_config = self.load_template_config()  # Load or create template config
+        
+        # Load Snowflake connection settings from config.ini
         self.snowflake_config = self.load_snowflake_config()
-        self.last_error: str = ""
-        self.context_warnings: List[str] = []
+        
+        # Error tracking for debugging and user feedback
+        self.last_error: str = ""  # Most recent error message
+        self.context_warnings: List[str] = []  # Non-fatal warnings during execution
         
     def setup_logging(self):
-        """Set up logging configuration."""
+        """
+        Configure logging infrastructure for activity tracking and debugging.
+        
+        Creates a timestamped log file in the current working directory and
+        configures both file and console output handlers. Log files include
+        timestamps, log levels, and detailed messages for troubleshooting.
+        
+        Returns:
+            logging.Logger: Configured logger instance for this automation run
+        
+        Log File Location:
+            Current directory / spp_automation_YYYYMMDD_HHMMSS.log
+        
+        Log Levels:
+            - INFO: Normal operations, query execution, file creation
+            - WARNING: Non-fatal issues, missing templates, context switches
+            - ERROR: Fatal errors, connection failures, query errors
+        """
+        # Create timestamped log file in current directory
         log_path = Path.cwd() / f"spp_automation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
         self.log_file = str(log_path)
         logging.basicConfig(
@@ -157,7 +306,46 @@ class SPPAutomationEnhanced:
         return None
     
     def connect_to_snowflake(self) -> bool:
-        """Connect to Snowflake using external browser authentication."""
+        """
+        Establish authenticated connection to Snowflake cloud data warehouse.
+        
+        Uses external browser authentication (SSO) for secure access without
+        storing passwords. Opens system browser for authentication, then
+        establishes database connection with configured warehouse, database,
+        and role settings.
+        
+        Authentication Flow:
+        -------------------
+        1. Validates user email is present
+        2. Opens system browser for SSO authentication
+        3. User completes authentication in browser (2-minute timeout)
+        4. Connection established upon successful auth
+        5. Sets database context (warehouse, database, role)
+        
+        Returns:
+            bool: True if connection successful, False otherwise
+        
+        Side Effects:
+            - Sets self.connection to active SnowflakeConnection instance
+            - Sets self.last_error if connection fails
+            - Appends to self.context_warnings for context setting issues
+            - Logs detailed connection information
+        
+        Connection Parameters:
+            - Account: HDSUPPLY-DATA
+            - Authenticator: externalbrowser (SSO)
+            - Insecure Mode: True (for internal network compatibility)
+            - Login Timeout: 120 seconds
+        
+        Database Context:
+            - Warehouse: WH_SUPPLYCHAIN_ANALYST_XSMALL (or from config)
+            - Database: DM_SUPPLYCHAIN (or from config)
+            - Role: SUPPLYCHAIN_ANALYST (or from config)
+        
+        Error Handling:
+            All exceptions are caught, logged, and stored in self.last_error
+            for user feedback. Returns False on any failure.
+        """
         try:
             settings = self.snowflake_config.copy()
             self.last_error = ""
@@ -249,7 +437,34 @@ class SPPAutomationEnhanced:
             return False
     
     def get_query_0_summary_metrics(self, vendor_numbers: List[str], report_month: str, date_filter: str) -> str:
-        """Generate Query 0 - Summary Metrics with immediate percentages including ASN success rate."""
+        """
+        Generate SQL query for Tab1 - Summary Metrics with KPI percentages.
+        
+        This query calculates high-level performance metrics as percentages:
+        1. Shipments In Full (1 Day) - First receipt within 1 business day
+        2. Inbound Fill Rate (28 Days) - Receipt completion within 28 days
+        3. Units On Time Complete - On-time and complete delivery performance
+        4. ASN Success Rate - Percentage of shipments with valid ASN
+        
+        Args:
+            vendor_numbers (List[str]): List of vendor numbers to filter (e.g., ["13479", "52889"])
+            report_month (str): Fiscal report month in format "FY2026-JAN"
+            date_filter (str): Date filter in YYYYMM format (e.g., "202601")
+        
+        Returns:
+            str: Formatted SQL query string ready for execution
+        
+        Data Sources:
+            - DM_SUPPLYCHAIN.VENDOR_PERFORMANCE.COMBINED_IPR_IB_VENDOR_PERFORMANCE (Metrics)
+            - EDP.STD_ECC.LIKP, LIPS, LFA1 (ASN Data from SAP delivery tables)
+        
+        Query Structure:
+            - CTE 1 (Metric_Data): Aggregated performance metrics with percentages
+            - CTE 2 (ASN_Data): Raw ASN records from SAP delivery system
+            - CTE 3 (ASN_Metric): Calculated ASN success rate
+            - Final: UNION ALL to combine metrics with ASN rate
+        """
+        # Join vendor numbers into SQL-safe comma-separated string
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""
@@ -470,7 +685,54 @@ WHERE IH.MANDT = '300'
 """
     
     def get_query_3_pdh_compliance(self, vendor_numbers: List[str]) -> str:
-        """Generate Query 3 - PDH Compliance Data with rolling 28-day filter."""
+        """
+        Generate SQL query for Tab4 - PDH (Product Data Hub) Compliance Tracking.
+        
+        **NEW IN v3.0**: This query tracks supplier compliance with Product Data Hub
+        maintenance requests, including response times, action status, and compliance
+        labels based on a rolling 28-day window.
+        
+        Compliance Logic:
+        ----------------
+        - **Compliant**: Supplier responded within 10 days OR has taken action
+        - **Non-Compliant**: No action after 10 days
+        - **Rolling 28-Day Filter**: Excludes requests where supplier actioned after 28 days
+        
+        Key Metrics:
+        -----------
+        - Days_Since_Request: Calendar days from request to now (or to response)
+        - Supplier_Action: "Actioned" (responded) or "Not-Actioned" (pending)
+        - Compliance_Label: "Compliant" or "Non-Compliant" based on 10-day threshold
+        - Time_Filter_Flag: Filters out actioned requests older than 28 days
+        
+        Args:
+            vendor_numbers (List[str]): List of vendor numbers to filter (e.g., ["13479"])
+        
+        Returns:
+            str: Formatted SQL query string for PDH compliance data
+        
+        Data Sources:
+            - EDP.STD_ENABLE.EW_VW_MAINTENANCE_REQUESTS_STG (Request records)
+            - EDP.STD_ENABLE.EW_VW_MAINTENANCE_APPROVAL_STG (Update/approval records)
+            - EDP.STD_ENABLE.EW_VW_MAINTENANCE_QUESTIONS_STG (Question records)
+            - EDP.STD_JDA.SKUEXTRACT (Vendor name lookup)
+        
+        Query Structure:
+            1. primary_request: HD Supply initiated maintenance requests
+            2. primary_approval: Vendor responses and attribute updates
+            3. Mait_Questions: Vendor questions on requests
+            4. Vendor_Name: Vendor name and buyer information
+            5. Final_PDH_Joins: Complex join with compliance calculations
+            6. split_rows: Splits semicolon-separated SKU lists into rows
+            7. Final SELECT: Applies 28-day filter and sorts results
+        
+        Time Calculations:
+            - Update_Minus_Request: Days from request to attribute update
+            - Question_Minus_Request: Days from request to question submission
+            - Days_Past: Lesser of the two above (first action taken)
+            - Days_Since_Request: Days from request to current date
+        """
+        # Join vendor numbers into SQL-safe comma-separated string for IN clause
         vendor_filter = "', '".join(vendor_numbers)
         
         return f"""

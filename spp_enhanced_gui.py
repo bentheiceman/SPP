@@ -1,9 +1,93 @@
 """
-SPP Metric Automation - Enhanced GUI with Template Configuration
-Modern, branded interface with user-configurable template paths.
+SPP Metric Automation - Enhanced GUI v3.0 with PDH Compliance
+==============================================================
+
+Graphical User Interface for HD Supply Supplier Performance (SPP) reporting tool.
+Provides intuitive, branded interface for generating comprehensive 4-tab Excel
+reports with vendor performance metrics, ASN data, and PDH compliance tracking.
+
+Key Features:
+------------
+- **HD Supply Branding**: Black and yellow corporate colors with professional styling
+- **Browser Authentication**: Secure SSO via external browser
+- **Template Support**: Optional Excel template customization (.xlsx, .xlsm)
+- **Multi-Vendor**: Process single or multiple vendors in one operation
+- **Real-time Logging**: Activity log with color-coded status messages
+- **Progress Tracking**: Visual feedback during report generation
+- **Error Handling**: User-friendly error messages with troubleshooting hints
+
+GUI Components:
+--------------
+1. **Header**: HD Supply logo and title "SPP Metric Automation Tool v3.0"
+2. **Authentication Section**: Email input and authentication button
+3. **Report Configuration**: Vendor, month, and date filter inputs
+4. **Template Settings**: Optional template path and format selection
+5. **Action Buttons**: Generate report, test connection, quick test
+6. **Activity Log**: Scrollable text area with colored status messages
+7. **Footer**: Version info, developer credits, status indicators
+
+Report Generation Workflow:
+--------------------------
+1. User enters HD Supply email and clicks "Authenticate"
+2. Browser opens for SSO authentication
+3. User fills vendor number(s), report month, date filter
+4. Optional: Select template file and format
+5. Click "Generate SPP Report" button
+6. Background thread executes automation
+7. Progress updates appear in activity log
+8. Completion message shows output file location
+9. Reports saved to Output/ folder
+
+Authentication:
+--------------
+- Uses Snowflake external browser authentication (SSO)
+- Credentials validated via HD Supply identity provider
+- Authentication persists for session duration
+- No passwords stored locally
+
+Thread Safety:
+-------------
+- Report generation runs in background thread
+- GUI remains responsive during automation
+- Thread-safe logging to activity log
+- Prevents multiple concurrent report generations
+
+Color Scheme:
+------------
+- Primary Black: #000000 (backgrounds)
+- Secondary Black: #1A1A1A (sections)
+- Accent Yellow: #FFFF00 (highlights)
+- Success Green: #00FF00 (success messages)
+- Error Red: #FF0000 (error messages)
+- Info Blue: #0066CC (informational messages)
+
+Usage Example:
+-------------
+```python
+import tkinter as tk
+from spp_enhanced_gui import SPPEnhancedGUI
+
+# Create main window
+root = tk.Tk()
+
+# Initialize GUI
+app = SPPEnhancedGUI(root)
+
+# Start event loop
+root.mainloop()
+```
+
+File Outputs:
+------------
+- Excel Reports: Output/VENDOR# - VENDOR_NAME - MONTH.xlsx
+- Log Files: spp_gui_YYYYMMDD_HHMMSS.log
+- Activity visible in GUI log area
 
 Developer: Ben F. Benjamaa
 Manager: Lauren B. Trapani
+Team: HD Supply Chain Excellence
+Version: 3.0
+Release Date: January 7, 2026
 """
 
 import tkinter as tk
@@ -38,7 +122,53 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class SPPEnhancedGUI:
-    """Enhanced SPP Automation GUI with template configuration capabilities."""
+    """
+    Enhanced SPP Automation GUI with template configuration and PDH compliance.
+    
+    This class provides a professional, branded graphical interface for the SPP
+    automation engine. It handles user input, authentication, report generation,
+    and real-time activity logging with HD Supply branding.
+    
+    Architecture:
+    ------------
+    - Main thread: GUI event loop, user interactions
+    - Background thread: Report generation (prevents GUI freezing)
+    - Thread-safe logging: Queue-based communication between threads
+    
+    Key Attributes:
+        root (tk.Tk): Main window instance
+        automation (SPPAutomationEnhanced): Backend automation engine
+        authenticated (bool): Authentication status flag
+        colors (Dict[str, str]): HD Supply brand color palette
+        *_var (tk.StringVar/BooleanVar): Tkinter variables for form inputs
+    
+    GUI Sections:
+        - Header: Branded title and subtitle
+        - Auth Section: Email input and authentication
+        - Report Config: Vendor, month, date inputs
+        - Template Config: Optional template settings
+        - Actions: Generate, test, and utility buttons
+        - Activity Log: Scrollable status and error messages
+        - Footer: Version and developer information
+    
+    Thread-Safe Operations:
+        - Report generation runs in background thread
+        - Activity log updates via thread-safe method
+        - GUI remains responsive during long operations
+        - Prevents concurrent report generation
+    
+    Error Handling:
+        All errors are caught, logged, and displayed to user with
+        actionable messages. Common issues include:
+        - Authentication failures (VPN, credentials)
+        - Network timeouts (Snowflake connection)
+        - No data found (invalid vendor/month)
+        - Template file not found
+    
+    Brand Compliance:
+        Uses HD Supply official colors (black #000000, yellow #FFFF00)
+        and maintains consistent styling throughout interface.
+    """
     
     def __init__(self, root):
         logger.info("Initializing Enhanced SPP Automation GUI")
