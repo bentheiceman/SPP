@@ -44,7 +44,7 @@ class SPPEnhancedGUI:
         logger.info("Initializing Enhanced SPP Automation GUI")
         
         self.root = root
-        self.root.title("SPP Metric Automation Tool - HD Supply Enhanced")
+        self.root.title("SPP Metric Automation Tool v3.0 - With PDH Compliance")
         self.root.geometry("1000x900")
         
         # HD Supply Brand Colors
@@ -231,7 +231,7 @@ class SPPEnhancedGUI:
         
         ttk.Label(header_frame, text="SPP Metric Automation Tool", 
                  style='Header.TLabel').pack()
-        ttk.Label(header_frame, text="Enhanced Version v2.2 with Template Configuration", 
+        ttk.Label(header_frame, text="Enhanced Version v3.0 with PDH Compliance", 
                  style='Subtitle.TLabel').pack()
         
         # Authentication Section
@@ -666,6 +666,7 @@ class SPPEnhancedGUI:
         self.log_message(f"Report Month: {report_month}")
         self.log_message(f"Date Filter: {date_filter}")
         self.log_message(f"Use Template: {self.use_template_var.get()}")
+        self.log_message("Generating 4 tabs: Summary, Basic Metrics, ASN Data, PDH Compliance")
         
         # Run automation in background
         threading.Thread(target=self._run_automation_thread, 

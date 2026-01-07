@@ -469,6 +469,195 @@ WHERE IH.MANDT = '300'
     AND IH.ERDAT LIKE '{date_filter}%' -- Filter for December 2024
 """
     
+    def get_query_3_pdh_compliance(self, vendor_numbers: List[str]) -> str:
+        """Generate Query 3 - PDH Compliance Data with rolling 28-day filter."""
+        vendor_filter = "', '".join(vendor_numbers)
+        
+        return f"""
+With primary_request As (
+    Select
+        InternalRecordID,
+        Request_ID_PK1,
+        Supplier_Name,
+        Product_List,
+        Request_Sent_Date,
+        Request_Status,
+        Request_Type
+    From EDP.STD_ENABLE.EW_VW_MAINTENANCE_REQUESTS_STG
+    Where REQUEST_INITITATOR_TYPE = 'HDS Initiated'
+    And Supplier_Name in ('{vendor_filter}')
+),
+
+primary_approval As (
+    Select
+        InternalRecordID,
+        ASSOCIATED_REQUEST_ID,
+        REVIEW_ID_PK1,
+        Vendor_Number,
+        HDS_Part_Number,
+        Vendor_Part_Number,
+        Attribute_Update_Date
+    From EDP.STD_ENABLE.EW_VW_MAINTENANCE_APPROVAL_STG
+),
+
+Mait_Questions As (
+    Select 
+        INTERNALRECORDID,
+        REVIEW_ID_PK1,
+        QUESTION_ID_PK2,
+        QUESTION_DATE,
+        VENDOR_NUMBER
+    From EDP.STD_ENABLE.EW_VW_MAINTENANCE_QUESTIONS_STG
+),
+
+Vendor_Name As (
+SELECT 
+    LTRIM(UDC_PRIMARY_VENDOR, 'E_') AS TRIMMED_VENDOR,
+    UDC_PRIMARY_VENDOR_DESCR,
+    UDC_BUYER_ID,
+    UDC_BUYER
+FROM EDP.STD_JDA.SKUEXTRACT
+WHERE UDC_PRIMARY_VENDOR NOT LIKE 'NO_VALUE'
+GROUP BY 
+    LTRIM(UDC_PRIMARY_VENDOR, 'E_'),
+    UDC_PRIMARY_VENDOR_DESCR,
+    UDC_BUYER_ID,
+    UDC_BUYER
+ORDER BY 
+    TRIMMED_VENDOR,
+    UDC_BUYER
+),
+
+Final_PDH_Joins As (
+Select
+Primary_Request.Internalrecordid as Request_ID,
+Primary_Approval.Internalrecordid as Update_ID,
+Mait_Questions.INTERNALRECORDID as Question_ID,
+Primary_Request.Supplier_Name as Supplier_Number,
+Vendor_Name.UDC_PRIMARY_VENDOR_DESCR as Supplier_Name,
+Primary_Request.Product_List as Initial_Request_SKUs,
+Primary_Approval.HDS_Part_Number as Updated_HDS_SKU,
+Primary_Approval.Vendor_Part_Number as Updated_Supplier_SKU,
+Primary_Request.Request_Sent_Date as Request_Date,
+Primary_Approval.Attribute_Update_Date as Update_Date,
+Mait_Questions.Question_Date,
+Primary_Request.Request_Status,
+Primary_Request.Request_Type as Requested_Info,
+
+    Case
+        When ATTRIBUTE_UPDATE_DATE Is NULL
+            Then DATEDIFF('day', REQUEST_SENT_DATE, CURRENT_TIMESTAMP())
+        Else DATEDIFF('day', REQUEST_SENT_DATE, ATTRIBUTE_UPDATE_DATE)
+    End As Update_Minus_Request,
+
+    Case 
+        When QUESTION_DATE Is NULL
+            Then DATEDIFF('day',Request_Sent_Date, CURRENT_TIMESTAMP())
+        Else DATEDIFF('day',Request_Sent_Date, QUESTION_DATE)
+    End As Question_Minus_Request,
+
+    Case
+        When Update_Minus_Request > Question_Minus_Request
+            Then Question_Minus_Request
+            Else Update_Minus_Request
+    End As Days_Past,
+
+    DATEDIFF('day',Request_Sent_Date, CURRENT_TIMESTAMP()) as Days_Since_Request,
+
+    Case
+        When Attribute_Update_Date IS NULL
+            And QUESTION_DATE IS NULL
+            And Request_Status <> 'Maintenance Rejected'
+            And Request_Status <> 'HDS Team Review'
+        Then 'Not-Actioned'
+        Else 'Actioned'
+    END As Supplier_Action,
+
+    Case
+        When Days_Past <= '10'
+        OR Supplier_Action = 'Actioned'
+        Then 'Compliant'
+        Else 'Non-Compliant'
+    End As Compliance_Label,
+
+    Case 
+        When Supplier_Action='Actioned'
+            And Days_Since_Request >='28'
+        Then '1'
+        Else '0'
+    End As Time_Filter_Flag  
+
+From Primary_Request
+LEFT Join Primary_Approval
+ON Primary_Request.REQUEST_ID_PK1 = Primary_Approval.Associated_Request_ID
+LEFT JOIN MAIT_QUESTIONS 
+ON Primary_Request.REquest_ID_PK1 = Mait_Questions.REVIEW_ID_PK1
+LEFT JOIN Vendor_Name
+ON TRIMMED_VENDOR = Supplier_Number
+
+Where Request_Status <> 'HDS Maintenance Canceled'
+And Request_Status <> 'New'
+),
+
+split_rows AS (
+  SELECT
+    f.Request_ID,
+    f.Update_ID,
+    f.Question_ID,
+    f.Supplier_Number,
+    f.Supplier_Name,
+    f.Initial_Request_SKUs,
+    f.Updated_HDS_SKU,
+    f.Updated_Supplier_SKU,
+    
+    DATE(f.Request_Date) AS Request_Date_Day,
+    TIME(f.Request_Date) AS Request_Date_Time,
+
+    DATE(f.Update_Date) AS Update_Date_Day,
+    TIME(f.Update_Date) AS Update_Date_Time,
+
+    DATE(f.Question_Date) AS Question_Date_Day,
+    TIME(f.Question_Date) AS Question_Date_Time,
+
+    f.Request_Status,
+    f.Requested_Info,
+    f.Compliance_Label,
+    f.Supplier_Action,
+    f.Days_Past as Days_Since_Request,
+    f.Time_Filter_Flag,
+
+    s.index AS token_index,
+    s.value AS Requested_SKU
+  FROM final_pdh_joins f,
+       LATERAL SPLIT_TO_TABLE(f.Initial_Request_SKUs, ';') s
+  WHERE f.Time_Filter_Flag <> '1'
+)
+
+SELECT
+Supplier_Number,
+Supplier_Name,
+Requested_SKU,
+
+Request_Status,
+Requested_Info,
+
+Request_ID,
+Request_Date_Day,
+
+Question_ID,
+Question_Date_Day,
+
+Update_ID,
+Update_Date_Day,
+
+Days_Since_Request,
+Compliance_Label,
+Supplier_Action
+
+FROM split_rows
+ORDER BY Request_ID, token_index
+"""
+    
     def execute_query(self, query: str) -> pd.DataFrame:
         """Execute a query and return results as DataFrame."""
         try:
@@ -577,7 +766,8 @@ WHERE IH.MANDT = '300'
             tab_mapping = {
                 'Summary_Metrics': 'Tab1_Summary_Metrics',
                 'Basic_Metrics': 'Tab2_Basic_Metrics',
-                'ASN_Data': 'Tab3_ASN_Data'
+                'ASN_Data': 'Tab3_ASN_Data',
+                'PDH_Compliance': 'Tab4_PDH_Compliance'
             }
             
             for data_key, sheet_name in tab_mapping.items():
@@ -640,7 +830,8 @@ WHERE IH.MANDT = '300'
                 sheet_mapping = {
                     'Summary_Metrics': 'Tab1_Summary_Metrics',
                     'Basic_Metrics': 'Tab2_Basic_Metrics',
-                    'ASN_Data': 'Tab3_ASN_Data'
+                    'ASN_Data': 'Tab3_ASN_Data',
+                    'PDH_Compliance': 'Tab4_PDH_Compliance'
                 }
                 
                 for data_key, sheet_name in sheet_mapping.items():
@@ -684,13 +875,18 @@ WHERE IH.MANDT = '300'
             query2 = self.get_query_2_asn_data(vendor_numbers, date_filter)
             df_asn = self.execute_query(query2)
             
-            if df_summary.empty and df_basic.empty and df_asn.empty:
+            self.logger.info("Executing PDH Compliance query...")
+            query3 = self.get_query_3_pdh_compliance(vendor_numbers)
+            df_pdh = self.execute_query(query3)
+            
+            if df_summary.empty and df_basic.empty and df_asn.empty and df_pdh.empty:
                 return "", "No data found for the specified criteria"
             
             # Get vendor name
             vendor_name = (self.get_vendor_name_from_data(df_summary) or 
                           self.get_vendor_name_from_data(df_basic) or 
                           self.get_vendor_name_from_data(df_asn) or 
+                          self.get_vendor_name_from_data(df_pdh) or 
                           "Unknown_Vendor")
             
             # Create output directory and filename
@@ -702,7 +898,8 @@ WHERE IH.MANDT = '300'
             data_dict = {
                 'Summary_Metrics': df_summary,
                 'Basic_Metrics': df_basic,
-                'ASN_Data': df_asn
+                'ASN_Data': df_asn,
+                'PDH_Compliance': df_pdh
             }
             
             # Create output file based on template configuration
@@ -747,7 +944,7 @@ WHERE IH.MANDT = '300'
                 creation_method = "standard Excel"
             
             if success:
-                status_msg = f"Successfully created {creation_method} file with {len(df_summary)} summary records, {len(df_basic)} basic metrics records and {len(df_asn)} ASN records"
+                status_msg = f"Successfully created {creation_method} file with {len(df_summary)} summary records, {len(df_basic)} basic metrics records, {len(df_asn)} ASN records, and {len(df_pdh)} PDH compliance records"
                 self.logger.info(f"=== Automation Complete ===")
                 self.logger.info(f"Output file: {output_path}")
                 return output_path, status_msg
